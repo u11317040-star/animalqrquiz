@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>可愛動物 QR 測驗</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg: #fff8fb;
+      --card: #ffffff;
+      --text: #5b4b5a;
+      --muted: #8d7890;
+      --primary: #ff9ec7;
+      --primary-dark: #f57db0;
+      --accent: #8bd3dd;
+      --ok: #7acb8f;
+      --bad: #f28f8f;
+      --border: #f7d5e5;
+      --shadow: 0 8px 20px rgba(245, 159, 187, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Microsoft JhengHei", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 10%, #ffe5f1 0%, transparent 30%),
+        radial-gradient(circle at 90% 15%, #e4f8fb 0%, transparent 30%),
+        var(--bg);
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: min(920px, 100%);
+      display: grid;
+      gap: 14px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #a55f82;
+    }
+
+    .sub {
+      margin: 8px 0 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    .stats {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-size: 0.98rem;
+      color: var(--muted);
+    }
+
+    .stats strong {
+      color: #7d5d74;
+      font-size: 1.02rem;
+    }
+
+    .question-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .animal-image {
+      width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+      border: 2px dashed #f6bfd8;
+      border-radius: 14px;
+      background: #fff;
+      padding: 8px;
+    }
+
+    .question-text {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%);
+      box-shadow: 0 6px 14px rgba(245, 125, 176, 0.35);
+      transition: transform 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    button.secondary {
+      background: linear-gradient(180deg, #9edbe2 0%, #7ec8d3 100%);
+      box-shadow: 0 6px 14px rgba(139, 211, 221, 0.35);
+    }
+
+    #reader {
+      width: 100%;
+      min-height: 320px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 2px solid #d5eef2;
+      background: #000;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .result {
+      min-height: 28px;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .result.ok {
+      color: var(--ok);
+    }
+
+    .result.bad {
+      color: var(--bad);
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="card">
+      <h1>可愛動物 QR 測驗</h1>
+      <p class="sub">共有 10 題，題目會隨機顯示狗、貓、牛、羊。請掃描對應的數字編碼 QR。</p>
+      <div class="stats">
+        <span>題目進度：<strong id="progress">0 / 10</strong></span>
+        <span>目前分數：<strong id="score">0</strong></span>
+      </div>
+    </section>
+
+    <section class="card question-grid">
+      <img id="animalImage" class="animal-image" alt="題目動物圖片" src="" />
+      <p id="questionText" class="question-text">按「開始測驗」後會出題並啟用掃描器。</p>
+      <audio id="animalAudio" preload="auto"></audio>
+      <div class="controls">
+        <button id="startBtn" type="button">開始測驗</button>
+        <button id="replayBtn" type="button" class="secondary" disabled>重播題目音效</button>
+      </div>
+      <div id="result" class="result" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <div id="reader"></div>
+      <p class="hint">
+        編碼規則：1=狗、2=貓、3=牛、4=羊。圖片路徑：assets/images/[編碼].png，音效路徑：assets/audio/[編碼].mp3。
+      </p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const TOTAL = 10;
+      const ANIMALS = [
+        { code: 1, name: "狗" },
+        { code: 2, name: "貓" },
+        { code: 3, name: "牛" },
+        { code: 4, name: "羊" },
+      ];
+
+      const progressEl = document.getElementById("progress");
+      const scoreEl = document.getElementById("score");
+      const questionTextEl = document.getElementById("questionText");
+      const imageEl = document.getElementById("animalImage");
+      const audioEl = document.getElementById("animalAudio");
+      const resultEl = document.getElementById("result");
+      const startBtn = document.getElementById("startBtn");
+      const replayBtn = document.getElementById("replayBtn");
+
+      let scanner = null;
+      let started = false;
+      let lockScan = false;
+      let score = 0;
+      let index = 0;
+      let questions = [];
+
+      function randomAnimal() {
+        return ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+      }
+
+      function buildQuestions() {
+        const arr = [];
+        for (let i = 0; i < TOTAL; i += 1) {
+          arr.push(randomAnimal());
+        }
+        return arr;
+      }
+
+      function setResult(msg, ok) {
+        resultEl.textContent = msg;
+        resultEl.className = "result " + (ok ? "ok" : "bad");
+      }
+
+      function clearResult() {
+        resultEl.textContent = "";
+        resultEl.className = "result";
+      }
+
+      function parseCode(decodedText) {
+        if (decodedText == null) return null;
+        const t = String(decodedText).trim();
+        const m = t.match(/[1-4]/);
+        return m ? Number(m[0]) : null;
+      }
+
+      function updateQuestion() {
+        if (index >= TOTAL) return;
+        const q = questions[index];
+        progressEl.textContent = (index + 1) + " / " + TOTAL;
+        questionTextEl.textContent = "第 " + (index + 1) + " 題：請掃描「" + q.name + "」對應的數字編碼。";
+        imageEl.src = "assets/images/" + q.code + ".png";
+        audioEl.src = "assets/audio/" + q.code + ".mp3";
+        replayBtn.disabled = false;
+
+        audioEl.currentTime = 0;
+        audioEl.play().catch(function () {
+          // Ignore autoplay block.
+        });
+      }
+
+      async function endQuiz() {
+        if (scanner) {
+          try {
+            await scanner.stop();
+          } catch (e) {
+            // Ignore stop errors.
+          }
+        }
+        started = false;
+        replayBtn.disabled = true;
+        questionTextEl.textContent = "測驗結束，做得很棒。";
+        imageEl.removeAttribute("src");
+        progressEl.textContent = TOTAL + " / " + TOTAL;
+        setResult("完成！總分：" + score + " / " + TOTAL, true);
+        startBtn.disabled = false;
+        startBtn.textContent = "重新開始";
+      }
+
+      async function onScan(decodedText) {
+        if (!started || lockScan || index >= TOTAL) return;
+        lockScan = true;
+
+        const scanned = parseCode(decodedText);
+        const correct = questions[index].code;
+
+        if (scanned === correct) {
+          score += 1;
+          scoreEl.textContent = String(score);
+          setResult("答對了！+1 分", true);
+          index += 1;
+
+          if (index >= TOTAL) {
+            await endQuiz();
+          } else {
+            updateQuestion();
+          }
+        } else {
+          setResult("編碼不正確，請再試一次。", false);
+        }
+
+        setTimeout(function () {
+          lockScan = false;
+        }, 700);
+      }
+
+      async function startScanner() {
+        if (!scanner) {
+          scanner = new Html5Qrcode("reader");
+        }
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 500, height: 500 } },
+          function (decodedText) {
+            onScan(decodedText);
+          },
+          function () {}
+        );
+      }
+
+      async function startQuiz() {
+        startBtn.disabled = true;
+        clearResult();
+        score = 0;
+        index = 0;
+        scoreEl.textContent = "0";
+        questions = buildQuestions();
+
+        try {
+          await startScanner();
+          started = true;
+          updateQuestion();
+        } catch (err) {
+          started = false;
+          startBtn.disabled = false;
+          setResult("無法啟用相機掃描：" + (err && err.message ? err.message : String(err)), false);
+        }
+      }
+
+      startBtn.addEventListener("click", function () {
+        startQuiz();
+      });
+
+      replayBtn.addEventListener("click", function () {
+        if (!started || index >= TOTAL) return;
+        audioEl.currentTime = 0;
+        audioEl.play().catch(function () {});
+      });
+    })();
+  </script>
+</body>
+</html>
